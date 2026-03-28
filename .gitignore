@@ -1,0 +1,4 @@
+testingWithVoiceAssistant/Models/
+*.gguf
+*.bin
+*.mlmodelc
