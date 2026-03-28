@@ -21,64 +21,64 @@ Tap the mic. Speak. Watch your words appear on screen in real time. Stop speakin
 │                  VOICE INPUT PIPELINE                               │
 │                                                                     │
 │  ┌─────────────┐                                                    │
-│  │  User Mic   │  Air pressure → diaphragm → voltage               │
+│  │  User Mic   │  Air pressure → diaphragm → voltage                │
 │  └──────┬──────┘                                                    │
-│         │ AVAudioSession (.record, .measurement)                   │
+│         │ AVAudioSession (.record, .measurement)                    │
 │         ▼                                                           │
-│  ┌──────────────────────────────────┐                              │
-│  │        AVAudioEngine             │                              │
-│  │  inputNode tap (4096 samples)    │                              │
-│  │  Native format: 48kHz stereo     │                              │
-│  └──────────────┬───────────────────┘                              │
+│  ┌──────────────────────────────────┐                               │
+│  │        AVAudioEngine             │                               │
+│  │  inputNode tap (4096 samples)    │                               │
+│  │  Native format: 48kHz stereo     │                               │
+│  └──────────────┬───────────────────┘                               │
 │                 │                                                   │
 │                 ▼                                                   │
-│  ┌──────────────────────────────────┐                              │
-│  │       AVAudioConverter           │                              │
-│  │  → 16kHz mono float32           │  Required by Whisper.cpp     │
-│  └──────────────┬───────────────────┘                              │
-│                 │ [Float] @ 16kHz                                  │
+│  ┌──────────────────────────────────┐                               │
+│  │       AVAudioConverter           │                               │
+│  │  → 16kHz mono float32           │  Required by Whisper.cpp       │
+│  └──────────────┬───────────────────┘                               │
+│                 │ [Float] @ 16kHz                                   │
 │                 ▼                                                   │
-│  ┌──────────────────────────────────┐                              │
-│  │    AudioCaptureService           │                              │
-│  │  Accumulates frames              │                              │
-│  │  Fires onChunk every 48k frames  │  = 3 seconds of audio       │
-│  └──────────────┬───────────────────┘                              │
-│                 │ onChunk([Float]) callback                        │
+│  ┌──────────────────────────────────┐                               │
+│  │    AudioCaptureService           │                               │
+│  │  Accumulates frames              │                               │
+│  │  Fires onChunk every 48k frames  │  = 3 seconds of audio         │
+│  └──────────────┬───────────────────┘                               │
+│                 │ onChunk([Float]) callback                         │
 │                 ▼                                                   │
-│  ┌──────────────────────────────────┐                              │
-│  │    RingBuffer (480k capacity)    │  = 30-second rolling window  │
-│  │  append() — trims if over cap    │                              │
-│  │  readNewChunk() — only new data  │  readIndex cursor            │
-│  └──────────────┬───────────────────┘                              │
-│                 │ New [Float] frames only                          │
+│  ┌──────────────────────────────────┐                               │
+│  │    RingBuffer (480k capacity)    │  = 30-second rolling window   │
+│  │  append() — trims if over cap    │                               │
+│  │  readNewChunk() — only new data  │  readIndex cursor             │
+│  └──────────────┬───────────────────┘                               │
+│                 │ New [Float] frames only                           │
 │                 ▼                                                   │
-│  ┌──────────────────────────────────┐                              │
-│  │  TranscriptViewModel             │                              │
-│  │                                  │                              │
-│  │  ┌──────────────────────────┐    │                              │
-│  │  │  computeEnergy() — RMS   │    │  Silence detection          │
-│  │  │  < 0.01 for >= 1.5s      │    │  → finalizeTranscript()     │
-│  │  └──────────────────────────┘    │                              │
-│  │                                  │                              │
-│  │  ┌──────────────────────────┐    │                              │
-│  │  │   WhisperEngine          │    │  Local inference            │
-│  │  │   whisper.base, greedy   │    │  ~200ms per chunk           │
-│  │  │   English, 4 threads     │    │  No fallback, no context    │
-│  │  └──────────────────────────┘    │                              │
-│  │                                  │                              │
-│  │  ┌──────────────────────────┐    │                              │
-│  │  │  mergeTranscript()       │    │  Deduplication              │
-│  │  │  Prefix match            │    │  Prevents flickering        │
-│  │  │  Suffix dedup            │    │  No repeated words          │
-│  │  └──────────────────────────┘    │                              │
-│  └──────────────┬───────────────────┘                              │
-│                 │ @Observable transcript                           │
+│  ┌──────────────────────────────────┐                               │
+│  │  TranscriptViewModel             │                               │
+│  │                                  │                               │
+│  │  ┌──────────────────────────┐    │                               │
+│  │  │  computeEnergy() — RMS   │    │  Silence detection            │
+│  │  │  < 0.01 for >= 1.5s      │    │  → finalizeTranscript()       │
+│  │  └──────────────────────────┘    │                               │
+│  │                                  │                               │
+│  │  ┌──────────────────────────┐    │                               │
+│  │  │   WhisperEngine          │    │  Local inference              │
+│  │  │   whisper.base, greedy   │    │  ~200ms per chunk             │
+│  │  │   English, 4 threads     │    │  No fallback, no context      │
+│  │  └──────────────────────────┘    │                               │
+│  │                                  │                               │
+│  │  ┌──────────────────────────┐    │                               │
+│  │  │  mergeTranscript()       │    │  Deduplication                │
+│  │  │  Prefix match            │    │  Prevents flickering          │
+│  │  │  Suffix dedup            │    │  No repeated words            │
+│  │  └──────────────────────────┘    │                               │
+│  └──────────────┬───────────────────┘                               │
+│                 │ @Observable transcript                            │
 │                 ▼                                                   │
-│  ┌──────────────────────────────────┐                              │
-│  │      TranscriptView (SwiftUI)    │                              │
-│  │  idle → recording → processing  │                              │
-│  │       → completed / error       │                              │
-│  └──────────────────────────────────┘                              │
+│  ┌──────────────────────────────────┐                               │
+│  │      TranscriptView (SwiftUI)    │                               │
+│  │  idle → recording → processing  │                                │
+│  │       → completed / error       │                                │
+│  └──────────────────────────────────┘                               │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -250,6 +250,3 @@ Mic → [VoiceInput] → Transcript
 
 ---
 
-## License
-
-MIT
