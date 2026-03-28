@@ -11,6 +11,7 @@ final class AudioCaptureService {
 
     var onChunk: (([Float]) -> Void)?
 
+    
     private let engine = AVAudioEngine()
     private var frames: [Float] = []
     private var lastEmitCount: Int = 0
